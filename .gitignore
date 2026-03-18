@@ -1,0 +1,22 @@
+# Ignorer tout par défaut
+*
+
+# Garder les fichiers Python et les notebooks Jupyter
+!*.py
+!*.ipynb
+
+# Garder les fichiers de configuration Git et le README
+!.gitignore
+!README.md
+
+# Garder les répertoires (nécessaire pour que Git traverse l'arborescence)
+!*/
+
+# Ignorer les caches Python dans les sous-dossiers
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Ignorer les checkpoints Jupyter
+**/.ipynb_checkpoints/
