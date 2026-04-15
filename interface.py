@@ -366,8 +366,13 @@ def run_pipeline(audio_path, C, emotion=None):
     # TTS
     if C.get("tts"):
         try:
+            import soundfile as _sf, sounddevice as _sd
             wav = "_vox_resp.wav"
             C["tts"].synthesize(resp, wav)
+            # Lecture bloquante dans le spinner — haut-parleurs du PC
+            data, sr = _sf.read(wav)
+            _sd.play(data, sr)
+            _sd.wait()
             R["tts"] = {"ok": True, "wav": wav, "error": ""}
         except Exception as e:
             R["tts"] = {"ok": False, "wav": None, "error": str(e)}
@@ -455,6 +460,11 @@ if audio_path:
         e = R["emotion"]
         st.markdown(f'<div><span class="emo-badge">🔗 fusion · vocal + visage · {e["emoji"]} {e["emotion"]}</span></div>', unsafe_allow_html=True)
 
+    # ── PROMPT ENVOYÉ AU LLM ──
+    if R["llm"].get("prompt"):
+        st.markdown(f'<div style="margin:0.4rem 0;font-size:0.62rem;letter-spacing:0.15em;color:#1e4060;text-transform:uppercase;">Prompt envoyé au LLM</div>', unsafe_allow_html=True)
+        st.code(R["llm"]["prompt"], language=None)
+
     # ── RÉPONSE ──
     if R["llm"]["ok"]:
         st.markdown(f'''
@@ -464,7 +474,7 @@ if audio_path:
         </div>''', unsafe_allow_html=True)
 
     if R["tts"]["ok"] and R["tts"].get("wav") and Path(R["tts"]["wav"]).exists():
-        st.audio(R["tts"]["wav"], autoplay=True)
+        st.audio(R["tts"]["wav"])
 
     if R["asr"]["ok"] and R["llm"]["ok"]:
         st.session_state.history.append({
