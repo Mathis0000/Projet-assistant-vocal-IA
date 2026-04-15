@@ -53,7 +53,7 @@ class WhisperASR:
         self.model_size = model_size
         print(f"[ASR] Chargement Whisper {model_size}...")
         self.model = whisper.load_model(model_size)
-        print(f"[ASR] Whisper {model_size} chargé ✓")
+        print(f"[ASR] Whisper {model_size} charge OK")
 
     def transcribe_file(self, audio_path, language="fr"):
         """

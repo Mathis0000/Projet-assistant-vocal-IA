@@ -31,7 +31,7 @@ from tts_component import PytTTSSynthesizer
 # ============================================================================
 
 OLLAMA_URL = "http://localhost:11434"
-MODEL = "phi3:mini"
+MODEL = "tinyllama:latest"
 
 SYSTEM_PROMPT = """Tu es un assistant vocal en français.
 Réponds en une seule phrase courte et naturelle, sans aucune exception.

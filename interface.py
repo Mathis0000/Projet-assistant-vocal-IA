@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 TP 3 - Interface Streamlit — Assistant Vocal Mr Smith
-Auto-analyse dès l'enregistrement + orbe vocal animé
+Audio natif (st.audio_input) → ASR → LLM (+ émotion webcam) → TTS
 """
 
 import streamlit as st
 import numpy as np
-import soundfile as sf
 import os, sys
 from pathlib import Path
 from datetime import datetime
@@ -43,7 +42,6 @@ html, body, [data-testid="stAppViewContainer"] {
     pointer-events: none; z-index: 0; opacity: 0.4;
 }
 
-/* ── HEADER ── */
 .vox-header { padding: 3rem 0 0.5rem; text-align: center; position: relative; }
 .vox-title {
     font-family: 'Syne', sans-serif; font-size: 4.5rem; font-weight: 800;
@@ -65,11 +63,6 @@ html, body, [data-testid="stAppViewContainer"] {
 .vox-sub {
     font-size: 0.65rem; letter-spacing: 0.45em; color: #1e4060;
     margin-top: 0.5rem; text-transform: uppercase;
-    animation: fadeInUp 1s ease 0.3s both;
-}
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
 }
 .scanner-wrap { position: relative; height: 2px; margin: 1.2rem 0; overflow: hidden; background: #0a1520; }
 .scanner-line {
@@ -79,11 +72,9 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 @keyframes scan { 0% { left: -30%; } 100% { left: 110%; } }
 
-/* ── ORBE VOCAL ── */
 .orb-wrap {
     display: flex; flex-direction: column; align-items: center;
-    justify-content: center; padding: 1.5rem 0 1rem;
-    gap: 1rem;
+    justify-content: center; padding: 1.5rem 0 1rem; gap: 1rem;
 }
 .orb-ring-container {
     position: relative; width: 160px; height: 160px;
@@ -113,96 +104,23 @@ html, body, [data-testid="stAppViewContainer"] {
     0%, 100% { transform: scale(1);    box-shadow: 0 0 30px rgba(0,229,255,0.5), 0 0 60px rgba(0,229,255,0.2); }
     50%       { transform: scale(1.06); box-shadow: 0 0 50px rgba(0,229,255,0.8), 0 0 100px rgba(0,229,255,0.3); }
 }
-/* Orbe en mode "parle" */
-.orb-core.speaking {
-    animation: coreTalk 0.15s ease-in-out infinite alternate;
-    background: radial-gradient(circle at 35% 35%, #ff0af5, #6e004d 60%, #1a001e);
-    box-shadow: 0 0 30px rgba(255,0,200,0.6), 0 0 80px rgba(255,0,200,0.3);
-}
-@keyframes coreTalk {
-    from { transform: scale(0.95); }
-    to   { transform: scale(1.12); }
-}
-.orb-ring.speaking {
-    border-color: rgba(255,0,200,0.3);
-    animation: orbTalk 0.3s ease-in-out infinite alternate;
-}
-@keyframes orbTalk {
-    from { transform: scale(1); }
-    to   { transform: scale(1.1); opacity: 0.8; }
-}
 .orb-status {
     font-size: 0.65rem; letter-spacing: 0.3em; text-transform: uppercase;
     color: #1e4060; text-align: center;
-    animation: fadeInUp 0.3s ease;
 }
-.orb-status.active { color: #00e5ff; }
-
-/* Waveform live (pendant analyse) */
-.live-wave {
-    display: flex; align-items: center; justify-content: center;
-    gap: 3px; height: 40px;
-}
-.lw-bar {
-    width: 3px; border-radius: 3px;
-    background: linear-gradient(to top, #004d6e, #00e5ff);
-    animation: lw 0.8s ease-in-out infinite;
-    transform-origin: bottom;
-}
-.lw-bar:nth-child(1)  { height:8px;  animation-delay:0.00s; }
-.lw-bar:nth-child(2)  { height:18px; animation-delay:0.06s; }
-.lw-bar:nth-child(3)  { height:28px; animation-delay:0.12s; }
-.lw-bar:nth-child(4)  { height:20px; animation-delay:0.18s; }
-.lw-bar:nth-child(5)  { height:34px; animation-delay:0.24s; }
-.lw-bar:nth-child(6)  { height:26px; animation-delay:0.30s; }
-.lw-bar:nth-child(7)  { height:36px; animation-delay:0.36s; }
-.lw-bar:nth-child(8)  { height:26px; animation-delay:0.42s; }
-.lw-bar:nth-child(9)  { height:34px; animation-delay:0.48s; }
-.lw-bar:nth-child(10) { height:20px; animation-delay:0.54s; }
-.lw-bar:nth-child(11) { height:28px; animation-delay:0.60s; }
-.lw-bar:nth-child(12) { height:16px; animation-delay:0.66s; }
-.lw-bar:nth-child(13) { height:8px;  animation-delay:0.72s; }
-@keyframes lw {
-    0%,100% { transform: scaleY(0.25); opacity:0.3; }
-    50%      { transform: scaleY(1);   opacity:1; }
-}
-
-/* ── TABS ── */
-[data-testid="stTabs"] [data-baseweb="tab-list"] {
-    background: rgba(8,18,28,0.8) !important;
-    border: 1px solid rgba(0,229,255,0.1) !important;
-    border-radius: 12px !important; padding: 5px !important; gap: 4px !important;
-}
-[data-testid="stTabs"] [data-baseweb="tab"] {
-    background: transparent !important; color: #2a5070 !important;
-    font-family: 'JetBrains Mono', monospace !important; font-size: 0.78rem !important;
-    letter-spacing: 0.08em !important; border-radius: 9px !important;
-    border: none !important; padding: 0.55rem 1.4rem !important; transition: all 0.25s !important;
-}
-[data-testid="stTabs"] [aria-selected="true"] {
-    background: rgba(0,229,255,0.08) !important; color: #00e5ff !important;
-    border: 1px solid rgba(0,229,255,0.2) !important;
-    box-shadow: 0 0 20px rgba(0,229,255,0.1) !important;
-}
-[data-baseweb="tab-highlight"], [data-baseweb="tab-border"] { display: none !important; }
 
 [data-testid="stAudioInput"], [data-testid="stFileUploader"] {
     background: rgba(8,18,28,0.6) !important;
     border: 1px dashed rgba(0,229,255,0.15) !important;
-    border-radius: 12px !important; transition: border-color 0.3s !important;
-}
-[data-testid="stFileUploader"] label, [data-testid="stAudioInput"] label {
-    color: #2a5070 !important; font-family: 'JetBrains Mono', monospace !important; font-size: 0.78rem !important;
+    border-radius: 12px !important;
 }
 audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 
-/* ── GLASS CARD ── */
 .glass-card {
     background: rgba(10, 22, 35, 0.75);
     border: 1px solid rgba(0, 229, 255, 0.1);
     border-radius: 16px; padding: 1.4rem 1.6rem; margin: 0.8rem 0;
-    position: relative; overflow: hidden; backdrop-filter: blur(10px);
-    transition: border-color 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
 }
 .glass-card::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
@@ -214,7 +132,6 @@ audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 }
 .card-label::before { content: ''; width: 16px; height: 1px; background: #00e5ff; display: inline-block; }
 
-/* ── PIPELINE ── */
 .pipe-wrap { display: flex; flex-direction: column; gap: 6px; }
 .pipe-step {
     display: flex; align-items: center; gap: 14px;
@@ -245,12 +162,10 @@ audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 .pipe-badge {
     font-size: 0.65rem; padding: 3px 10px; border-radius: 20px;
     background: rgba(0,229,255,0.08); color: #00e5ff;
-    border: 1px solid rgba(0,229,255,0.2); white-space: nowrap;
-    z-index: 1; box-shadow: 0 0 12px rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.2); white-space: nowrap; z-index: 1;
 }
 .pipe-err { color: #ff6b81; font-size: 0.8rem; z-index: 1; }
 
-/* ── RÉPONSE ── */
 .response-box {
     position: relative; border-radius: 16px; padding: 2.2rem 2rem;
     margin: 1rem 0; text-align: center; overflow: hidden;
@@ -260,9 +175,7 @@ audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 .response-box::after {
     content: ''; position: absolute; bottom: 0; left: 10%; right: 10%; height: 1px;
     background: linear-gradient(90deg, transparent, #00e5ff, transparent);
-    box-shadow: 0 0 20px #00e5ff; animation: pulseLine 2s ease infinite;
 }
-@keyframes pulseLine { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
 @keyframes responseAppear {
     from { opacity: 0; transform: scale(0.95) translateY(20px); }
     to   { opacity: 1; transform: scale(1) translateY(0); }
@@ -270,20 +183,25 @@ audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 .response-lbl { font-size: 0.6rem; letter-spacing: 0.35em; color: #1e4060; text-transform: uppercase; margin-bottom: 0.8rem; }
 .response-txt {
     font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700;
-    color: #e8f4fd; line-height: 1.4; text-shadow: 0 0 40px rgba(0,229,255,0.2);
+    color: #e8f4fd; line-height: 1.4;
 }
 
-/* ── HISTORIQUE ── */
+.emo-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 20px; padding: 4px 14px; font-size: 0.65rem; color: #00e5ff;
+    margin: 0.4rem 0;
+}
+
 .hist-row {
-    display: grid; grid-template-columns: 55px 1fr auto;
+    display: grid; grid-template-columns: 55px 1fr auto auto;
     align-items: center; gap: 12px; padding: 0.75rem 0;
     border-bottom: 1px solid rgba(15,32,48,0.8);
-    animation: fadeIn 0.3s ease;
 }
 .hist-row:last-child { border-bottom: none; }
-@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 .hist-t  { font-size: 0.68rem; color: #1e4060; }
 .hist-in { font-size: 0.8rem;  color: #c9d8e8; }
+.hist-emo { font-size: 0.75rem; }
 .hist-badge { font-size: 0.62rem; padding: 2px 9px; border-radius: 20px; background: rgba(0,229,255,0.06); color: #0099bb; border: 1px solid rgba(0,229,255,0.15); }
 
 .vox-divider { height: 1px; background: linear-gradient(90deg, transparent, #0f2030, transparent); margin: 1.2rem 0; }
@@ -331,16 +249,21 @@ audio { width: 100%; border-radius: 8px; margin-top: 0.5rem; }
 st.markdown("""
 <div class="vox-header">
     <div class="vox-title">Mr Smith</div>
-    <div class="vox-sub">Assistant Vocal &nbsp</div>
+    <div class="vox-sub">Assistant Vocal &nbsp;&bull;&nbsp; Émotion Faciale</div>
 </div>
 <div class="scanner-wrap"><div class="scanner-line"></div></div>
 """, unsafe_allow_html=True)
 
-# ════════════════════════ CONFIG OLLAMA ════════════════════════
+# ════════════════════════ CONFIG ════════════════════════
 import requests as _req
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL   = "http://localhost:11434"
 OLLAMA_MODEL = "phi3:mini"
-SYSTEM_PROMPT = "Tu es un assistant vocal en français. Réponds en une seule phrase courte et naturelle."
+SYSTEM_PROMPT = (
+    "Tu es Mr Smith, un assistant vocal empathique en français. "
+    "Quand le contexte mentionne l'émotion du visage de l'utilisateur, adapte ta réponse : "
+    "réconforte si triste, félicite si joyeux, calme si en colère, rassure si apeuré. "
+    "Réponds en une seule phrase courte et naturelle en français."
+)
 
 _TP_DIR = str(Path(__file__).parent)
 if _TP_DIR not in sys.path:
@@ -351,7 +274,7 @@ def query_ollama(prompt):
         r = _req.post(f"{OLLAMA_URL}/api/generate", json={
             "model": OLLAMA_MODEL, "prompt": prompt,
             "system": SYSTEM_PROMPT, "stream": False,
-            "options": {"num_predict": 60, "stop": [".", "!", "?"]}
+            "options": {"num_predict": 80, "stop": [".", "!", "?"]}
         }, timeout=60)
         r.raise_for_status()
         return r.json()["response"].strip(), True
@@ -382,30 +305,78 @@ def load_components():
         print(f"[ERROR] TTS: {e}"); C["tts"] = None
     return C
 
-def run_pipeline(audio_path, C):
-    R = {k: {"ok": False, "error": ""} for k in ["asr", "llm", "tts"]}
+@st.cache_resource(show_spinner=False)
+def load_face_detector():
+    try:
+        from face_emotion_component import FaceEmotionDetector
+        return FaceEmotionDetector()
+    except Exception as e:
+        print(f"[WARNING] Détecteur émotion non disponible: {e}")
+        return None
+
+def detect_emotion_from_image(img_bytes):
+    """Détecte l'émotion depuis les bytes d'une image (st.camera_input)."""
+    det = load_face_detector()
+    if det is None:
+        return None
+    try:
+        import cv2
+        arr = np.frombuffer(img_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return None
+        dets = det.predict_frame(frame)
+        if dets:
+            return dets[0]   # {emotion, emoji, confidence, scores, bbox}
+    except Exception as e:
+        print(f"[WARNING] Émotion: {e}")
+    return None
+
+def build_prompt(transcript, emotion):
+    """Construit le prompt LLM en incluant l'émotion si disponible."""
+    if emotion and emotion.get("confidence", 0) > 0.25:
+        prefix = f"[Émotion visage : {emotion['emoji']} {emotion['emotion']} ({emotion['confidence']:.0%})] "
+    else:
+        prefix = ""
+    return f"{prefix}L'utilisateur dit : \"{transcript}\""
+
+def run_pipeline(audio_path, C, emotion=None):
+    R = {k: {"ok": False, "error": ""} for k in ["asr", "emotion", "llm", "tts"]}
+    # ASR
     if not C.get("asr"):
         R["asr"]["error"] = "ASR non disponible"; return R
     try:
         t, c = C["asr"].transcribe_file(audio_path, language="fr")
         if not t: R["asr"]["error"] = "Transcription vide"; return R
         R["asr"] = {"ok": True, "transcript": t, "confidence": c, "error": ""}
-    except Exception as e: R["asr"]["error"] = str(e); return R
-    resp, ok = query_ollama(R["asr"]["transcript"])
-    R["llm"] = {"ok": ok, "response": resp, "model": OLLAMA_MODEL, "error": "" if ok else resp}
+    except Exception as e:
+        R["asr"]["error"] = str(e); return R
+    # Émotion
+    if emotion:
+        R["emotion"] = {"ok": True, "emotion": emotion["emotion"],
+                        "emoji": emotion["emoji"], "confidence": emotion["confidence"], "error": ""}
+    else:
+        R["emotion"] = {"ok": False, "error": "aucun visage détecté"}
+    # LLM
+    prompt = build_prompt(R["asr"]["transcript"], emotion)
+    resp, ok = query_ollama(prompt)
+    R["llm"] = {"ok": ok, "response": resp, "model": OLLAMA_MODEL,
+                "prompt": prompt, "error": "" if ok else resp}
     if not ok: return R
+    # TTS
     if C.get("tts"):
         try:
-            wav = "_vox_resp.wav"; C["tts"].synthesize(resp, wav)
+            wav = "_vox_resp.wav"
+            C["tts"].synthesize(resp, wav)
             R["tts"] = {"ok": True, "wav": wav, "error": ""}
-        except Exception as e: R["tts"] = {"ok": False, "wav": None, "error": str(e)}
+        except Exception as e:
+            R["tts"] = {"ok": False, "wav": None, "error": str(e)}
     return R
 
-# ════════════════════════ ORBE + INPUT ════════════════════════
+# ════════════════════════ SESSION ════════════════════════
 if "history" not in st.session_state: st.session_state.history = []
-if "last_audio_hash" not in st.session_state: st.session_state.last_audio_hash = None
 
-# Orbe — état initial : en attente
+# ════════════════════════ ORBE ════════════════════════
 st.markdown("""
 <div class="orb-wrap">
     <div class="orb-ring-container">
@@ -415,76 +386,74 @@ st.markdown("""
         <div class="orb-core">🎙</div>
     </div>
     <div class="orb-status">en attente</div>
-    <div class="live-wave">
-        <div class="lw-bar"></div><div class="lw-bar"></div><div class="lw-bar"></div>
-        <div class="lw-bar"></div><div class="lw-bar"></div><div class="lw-bar"></div>
-        <div class="lw-bar"></div><div class="lw-bar"></div><div class="lw-bar"></div>
-        <div class="lw-bar"></div><div class="lw-bar"></div><div class="lw-bar"></div>
-        <div class="lw-bar"></div>
-    </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ── TABS INPUT ──
-tab_mic, tab_file = st.tabs(["⬤  Microphone", "↑  Fichier WAV"])
-audio_path = None
+# ════════════════════════ WEBCAM (photo) + AUDIO ════════════════════════
+col_cam, col_mic = st.columns([1, 1])
 
-with tab_mic:
+with col_cam:
+    st.markdown('<div style="font-size:0.58rem;letter-spacing:0.3em;color:#00e5ff;text-transform:uppercase;margin-bottom:0.4rem;">Webcam — émotion</div>', unsafe_allow_html=True)
+    cam_img = st.camera_input(" ", label_visibility="collapsed")
+
+with col_mic:
+    st.markdown('<div style="font-size:0.58rem;letter-spacing:0.3em;color:#00e5ff;text-transform:uppercase;margin-bottom:0.4rem;">Microphone — parole</div>', unsafe_allow_html=True)
     ab = st.audio_input(" ", label_visibility="collapsed")
-    if ab:
-        data = ab.read()
-        h = hash(data)
-        with open("_vox_in.wav","wb") as f: f.write(data)
-        audio_path = "_vox_in.wav"
-        st.session_state.last_audio_hash = h
 
-with tab_file:
-    up = st.file_uploader(" ", type=["wav","mp3"], label_visibility="collapsed")
-    if up:
-        data = up.read()
-        h = hash(data)
-        with open("_vox_in.wav","wb") as f: f.write(data)
-        audio_path = "_vox_in.wav"
-        st.audio("_vox_in.wav")
-        st.session_state.last_audio_hash = h
+# ════════════════════════ ANALYSE AUTOMATIQUE ════════════════════════
+audio_path = None
+if ab:
+    with open("_vox_in.wav", "wb") as f:
+        f.write(ab.read())
+    audio_path = "_vox_in.wav"
 
-# ════════════════════════ AUTO-ANALYSE ════════════════════════
 if audio_path:
-    # Orbe "analyse en cours" — waveform rose/violet
-    st.markdown("""
-    <div style="text-align:center; margin: 0.5rem 0;">
-        <div style="font-size:0.65rem; letter-spacing:0.3em; color:#00e5ff; text-transform:uppercase;
-                    animation: fadeInUp 0.3s ease;">
-            ◎ analyse en cours...
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;margin:0.5rem 0;font-size:0.65rem;letter-spacing:0.3em;color:#00e5ff;text-transform:uppercase;">◎ analyse en cours...</div>', unsafe_allow_html=True)
+
+    # Détecter l'émotion depuis la photo webcam
+    emotion = None
+    if cam_img is not None:
+        emotion = detect_emotion_from_image(cam_img.getvalue())
 
     with st.spinner(""):
         C = load_components()
-        R = run_pipeline(audio_path, C)
+        R = run_pipeline(audio_path, C, emotion=emotion)
 
     # ── PIPELINE ──
     st.markdown('<div class="glass-card"><div class="card-label">Pipeline</div><div class="pipe-wrap">', unsafe_allow_html=True)
-    steps = [
-        ("asr", "🎙", "ASR",
-         lambda r: (f'"{r["transcript"]}"', f'{r["confidence"]:.0%}')),
-        ("llm", "🤖", "LLM",
-         lambda r: (r["response"][:55] + "…" if len(r["response"]) > 55 else r["response"], r["model"])),
-        ("tts", "🔊", "TTS",
-         lambda r: ("audio synthétisé", "")),
-    ]
     html = ""
-    for key, icon, lbl, fmt in steps:
-        r = R[key]
-        cls = "pipe-step" + (" err" if not r["ok"] else "")
-        if r["ok"]:
-            val, badge = fmt(r)
-            b = f'<span class="pipe-badge">{badge}</span>' if badge else ""
-            html += f'<div class="{cls}"><span class="pipe-icon">{icon}</span><span class="pipe-lbl">{lbl}</span><span class="pipe-val">{val}</span>{b}</div>'
-        else:
-            html += f'<div class="{cls} err"><span class="pipe-icon">✗</span><span class="pipe-lbl">{lbl}</span><span class="pipe-err">{r["error"]}</span></div>'
+
+    r = R["asr"]
+    if r["ok"]:
+        html += f'<div class="pipe-step"><span class="pipe-icon">🎙</span><span class="pipe-lbl">ASR</span><span class="pipe-val">"{r["transcript"]}"</span><span class="pipe-badge">{r["confidence"]:.0%}</span></div>'
+    else:
+        html += f'<div class="pipe-step err"><span class="pipe-icon">✗</span><span class="pipe-lbl">ASR</span><span class="pipe-err">{r["error"]}</span></div>'
+
+    r = R["emotion"]
+    if r["ok"]:
+        html += f'<div class="pipe-step"><span class="pipe-icon">{r["emoji"]}</span><span class="pipe-lbl">Émotion</span><span class="pipe-val">{r["emotion"]}</span><span class="pipe-badge">{r["confidence"]:.0%}</span></div>'
+    else:
+        html += f'<div class="pipe-step err"><span class="pipe-icon">👤</span><span class="pipe-lbl">Émotion</span><span class="pipe-err">{r["error"]}</span></div>'
+
+    r = R["llm"]
+    if r["ok"]:
+        txt = r["response"][:55] + "…" if len(r["response"]) > 55 else r["response"]
+        html += f'<div class="pipe-step"><span class="pipe-icon">🤖</span><span class="pipe-lbl">LLM</span><span class="pipe-val">{txt}</span><span class="pipe-badge">{r["model"]}</span></div>'
+    else:
+        html += f'<div class="pipe-step err"><span class="pipe-icon">✗</span><span class="pipe-lbl">LLM</span><span class="pipe-err">{r["error"]}</span></div>'
+
+    r = R["tts"]
+    if r["ok"]:
+        html += '<div class="pipe-step"><span class="pipe-icon">🔊</span><span class="pipe-lbl">TTS</span><span class="pipe-val">audio synthétisé</span></div>'
+    elif r.get("error"):
+        html += f'<div class="pipe-step err"><span class="pipe-icon">✗</span><span class="pipe-lbl">TTS</span><span class="pipe-err">{r["error"]}</span></div>'
+
     st.markdown(html + '</div></div>', unsafe_allow_html=True)
+
+    # Badge fusion vocal + émotion
+    if R["asr"]["ok"] and R["emotion"]["ok"]:
+        e = R["emotion"]
+        st.markdown(f'<div><span class="emo-badge">🔗 fusion · vocal + visage · {e["emoji"]} {e["emotion"]}</span></div>', unsafe_allow_html=True)
 
     # ── RÉPONSE ──
     if R["llm"]["ok"]:
@@ -495,26 +464,27 @@ if audio_path:
         </div>''', unsafe_allow_html=True)
 
     if R["tts"]["ok"] and R["tts"].get("wav") and Path(R["tts"]["wav"]).exists():
-        st.audio(R["tts"]["wav"])
+        st.audio(R["tts"]["wav"], autoplay=True)
 
     if R["asr"]["ok"] and R["llm"]["ok"]:
         st.session_state.history.append({
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "input": R["asr"]["transcript"],
-            "model": R["llm"]["model"],
-            "response": R["llm"]["response"]
+            "time":     datetime.now().strftime("%H:%M:%S"),
+            "input":    R["asr"]["transcript"],
+            "model":    R["llm"]["model"],
+            "emotion":  (R["emotion"]["emoji"] + " " + R["emotion"]["emotion"]) if R["emotion"]["ok"] else "—",
         })
 
 # ════════════════════════ HISTORIQUE ════════════════════════
 if st.session_state.history:
     st.markdown('<div class="vox-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="glass-card"><div class="card-label">Historique</div>', unsafe_allow_html=True)
-    rows = "".join(f'''
-    <div class="hist-row">
-        <span class="hist-t">{e["time"]}</span>
-        <span class="hist-in">{e["input"]}</span>
-        <span class="hist-badge">{e["model"]}</span>
-    </div>''' for e in reversed(st.session_state.history))
+    rows = "".join(
+        f'<div class="hist-row"><span class="hist-t">{e["time"]}</span>'
+        f'<span class="hist-in">{e["input"]}</span>'
+        f'<span class="hist-emo">{e.get("emotion","—")}</span>'
+        f'<span class="hist-badge">{e["model"]}</span></div>'
+        for e in reversed(st.session_state.history)
+    )
     st.markdown(rows + '</div>', unsafe_allow_html=True)
     if st.button("Effacer l'historique"):
         st.session_state.history = []
